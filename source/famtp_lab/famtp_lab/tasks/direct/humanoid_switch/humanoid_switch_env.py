@@ -76,6 +76,7 @@ class HumanoidSwitchEnv(DirectRLEnv):
         self.next_switch_step = torch.ones((self.num_envs,), dtype=torch.long, device=self.device)
         self.switch_event_mask = torch.zeros((self.num_envs,), dtype=torch.bool, device=self.device)
 
+        # Part-history ring buffers for manifold encoder.
         self.part_history: dict[str, torch.Tensor] = {
             name: torch.zeros((self.num_envs, cfg.latent_history_steps, self._part_dim), device=self.device)
             for name in PART_NAMES
@@ -102,6 +103,12 @@ class HumanoidSwitchEnv(DirectRLEnv):
         self.actions = torch.clamp(actions, -1.0, 1.0)
 
     def _extract_part_obs(self) -> dict[str, torch.Tensor]:
+        """Build part observations from raw state slices.
+
+        Shape notes:
+            state: (N, 16)
+            part_obs[name]: (N, 3)
+        """
         return {
             "left_leg": self.state[:, 0:3],
             "right_leg": self.state[:, 3:6],
@@ -110,7 +117,14 @@ class HumanoidSwitchEnv(DirectRLEnv):
             "right_arm": self.state[:, 12:15],
         }
 
-    def _update_part_history(self) -> None:
+#     def _update_part_history(self) -> None:
+    def _update_part_history(self) -> dict[str, torch.Tensor]:
+        """Shift history and append current part obs.
+
+        Shape notes:
+            part_history[name]: (N, H, 3)
+            returned part_obs[name]: (N, 3)
+        """
         part_obs = self._extract_part_obs()
         for name in PART_NAMES:
             self.part_history[name] = torch.roll(self.part_history[name], shifts=-1, dims=1)
@@ -174,6 +188,7 @@ class HumanoidSwitchEnv(DirectRLEnv):
 
         self._advance_bridge()
 
+        # Info payload exported to Gym infos via extras.
         self.extras["switch_event_mask"] = self.switch_event_mask.clone()
         self.extras["current_skill_id"] = self.current_skill_id.clone()
         self.extras["target_skill_id"] = self.target_skill_id.clone()
@@ -305,6 +320,7 @@ class HumanoidSwitchEnv(DirectRLEnv):
 
 
 def make_humanoid_switch_env(**kwargs) -> HumanoidSwitchEnv:
+    """Gym entry-point helper that builds default cfg when not provided."""
     cfg = kwargs.pop("cfg", None)
     if cfg is None:
         cfg = HumanoidSwitchEnvCfg()
