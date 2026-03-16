@@ -9,13 +9,14 @@ from .scene_cfg import make_scene_cfg
 
 @configclass
 class HumanoidSwitchEnvCfg(DirectRLEnvCfg):
-    """DirectRLEnv config for baseline-comparison studies."""
+    """DirectRLEnv config for baseline-comparison and FaMTP stage-1 studies."""
 
     decimation: int = 2
     episode_length_s: float = 8.0
 
     action_space: int = 8
-    observation_space: int = 18
+    # 16 state + 2 skill IDs + 20 latent summary (5 parts * (sin,cos,a[2]))
+    observation_space: int = 38
     state_space: int = 0
 
     sim: SimulationCfg = SimulationCfg(dt=1.0 / 120.0, render_interval=decimation)
@@ -41,3 +42,12 @@ class HumanoidSwitchEnvCfg(DirectRLEnvCfg):
     # Prior reward scales.
     rew_fullbody_disc_scale: float = 0.4
     rew_part_disc_scale: float = 0.1
+    rew_latent_part_scale: float = 0.15
+    rew_global_coupling_scale: float = 0.2
+
+    # FaMTP stage-1 ablations.
+    use_manifold_encoder: bool = True
+    use_latent_part_priors: bool = True
+    use_global_coupling: bool = True
+    latent_history_steps: int = 4
+    latent_dim_residual: int = 2

@@ -1,3 +1,5 @@
+"""Train FaMTP environments with RSL-RL baselines."""
+
 """
 Week-1 experiment plan command hook:
 1) build no-transition dataset
@@ -37,6 +39,11 @@ def parse_args() -> argparse.Namespace:
         choices=["ppo_cmd", "fullbody_amp", "partwise_raw", "famtp_stage1", "famtp_full"],
     )
     parser.add_argument("--chain-mode", type=str, default="fixed", choices=["fixed", "random"])
+    parser.add_argument("--use-manifold-encoder", type=int, choices=[0,1], default=1)
+    parser.add_argument("--use-latent-part-priors", type=int, choices=[0,1], default=1)
+    parser.add_argument("--use-global-coupling", type=int, choices=[0,1], default=1)
+    parser.add_argument("--latent-history-steps", type=int, default=4)
+    parser.add_argument("--latent-dim-residual", type=int, default=2)
     return parser.parse_args()
 
 
@@ -47,6 +54,14 @@ def main() -> None:
     env_cfg.chain_mode = args.chain_mode
     if args.num_envs is not None:
         env_cfg.scene.num_envs = args.num_envs
+
+    # FaMTP stage-1 ablations.
+    if args.prior_mode == "famtp_stage1":
+        env_cfg.use_manifold_encoder = bool(args.use_manifold_encoder)
+        env_cfg.use_latent_part_priors = bool(args.use_latent_part_priors)
+        env_cfg.use_global_coupling = bool(args.use_global_coupling)
+        env_cfg.latent_history_steps = args.latent_history_steps
+        env_cfg.latent_dim_residual = args.latent_dim_residual
 
     env = gym.make(args.task, cfg=env_cfg)
     env = RslRlPolicyObsWrapper(env)
