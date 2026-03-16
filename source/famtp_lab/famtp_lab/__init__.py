@@ -1,14 +1,10 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
-# All rights reserved.
-#
-# SPDX-License-Identifier: BSD-3-Clause
+"""FaMTP Isaac Lab external project package."""
 
-"""
-Python module serving as a project/extension template.
-"""
+from . import motion as motion
 
-# Register Gym environments.
-from .tasks import *
+try:
+    from . import tasks as tasks
+except ModuleNotFoundError:  # pragma: no cover - optional runtime dependency for non-sim scripts
+    tasks = None
 
-# Register UI extensions.
-from .ui_extension_example import *
+__all__ = ["tasks", "motion"]
