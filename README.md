@@ -1,135 +1,113 @@
-# Template for Isaac Lab Projects
+# famtp-isaaclab
 
-## Overview
+External Isaac Lab research project for **FaMTP (Factorized Manifold Transition Priors)**.
+This stage compares baseline priors in one codebase using a shared no-transition dataset protocol
+and shared switch-window evaluation protocol.
 
-This project/repository serves as a template for building projects or extensions based on Isaac Lab.
-It allows you to develop in an isolated environment, outside of the core Isaac Lab repository.
-
-**Key Features:**
-
-- `Isolation` Work outside the core Isaac Lab repository, ensuring that your development efforts remain self-contained.
-- `Flexibility` This template is set up to allow your code to be run as an extension in Omniverse.
-
-**Keywords:** extension, template, isaaclab
-
-## Installation
-
-- Install Isaac Lab by following the [installation guide](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/index.html).
-  We recommend using the conda or uv installation as it simplifies calling Python scripts from the terminal.
-
-- Clone or copy this project/repository separately from the Isaac Lab installation (i.e. outside the `IsaacLab` directory):
-
-- Using a python interpreter that has Isaac Lab installed, install the library in editable mode using:
-
-    ```bash
-    # use 'PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-    python -m pip install -e source/famtp_lab
-
-- Verify that the extension is correctly installed by:
-
-    - Listing the available tasks:
-
-        Note: It the task name changes, it may be necessary to update the search pattern `"Template-"`
-        (in the `scripts/list_envs.py` file) so that it can be listed.
-
-        ```bash
-        # use 'FULL_PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-        python scripts/list_envs.py
-        ```
-
-    - Running a task:
-
-        ```bash
-        # use 'FULL_PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-        python scripts/<RL_LIBRARY>/train.py --task=<TASK_NAME>
-        ```
-
-    - Running a task with dummy agents:
-
-        These include dummy agents that output zero or random agents. They are useful to ensure that the environments are configured correctly.
-
-        - Zero-action agent
-
-            ```bash
-            # use 'FULL_PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-            python scripts/zero_agent.py --task=<TASK_NAME>
-            ```
-        - Random-action agent
-
-            ```bash
-            # use 'FULL_PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-            python scripts/random_agent.py --task=<TASK_NAME>
-            ```
-
-### Set up IDE (Optional)
-
-To setup the IDE, please follow these instructions:
-
-- Run VSCode Tasks, by pressing `Ctrl+Shift+P`, selecting `Tasks: Run Task` and running the `setup_python_env` in the drop down menu.
-  When running this task, you will be prompted to add the absolute path to your Isaac Sim installation.
-
-If everything executes correctly, it should create a file .python.env in the `.vscode` directory.
-The file contains the python paths to all the extensions provided by Isaac Sim and Omniverse.
-This helps in indexing all the python modules for intelligent suggestions while writing code.
-
-### Setup as Omniverse Extension (Optional)
-
-We provide an example UI extension that will load upon enabling your extension defined in `source/famtp_lab/famtp_lab/ui_extension_example.py`.
-
-To enable your extension, follow these steps:
-
-1. **Add the search path of this project/repository** to the extension manager:
-    - Navigate to the extension manager using `Window` -> `Extensions`.
-    - Click on the **Hamburger Icon**, then go to `Settings`.
-    - In the `Extension Search Paths`, enter the absolute path to the `source` directory of this project/repository.
-    - If not already present, in the `Extension Search Paths`, enter the path that leads to Isaac Lab's extension directory directory (`IsaacLab/source`)
-    - Click on the **Hamburger Icon**, then click `Refresh`.
-
-2. **Search and enable your extension**:
-    - Find your extension under the `Third Party` category.
-    - Toggle it to enable your extension.
-
-## Code formatting
-
-We have a pre-commit template to automatically format your code.
-To install pre-commit:
+## Installation (editable)
 
 ```bash
-pip install pre-commit
+pip install -e source/famtp_lab
 ```
 
-Then you can run pre-commit with:
+## Build no-transition dataset
 
 ```bash
-pre-commit run --all-files
+python scripts/build_no_transition_dataset.py \
+  --input datasets/motion_index.json \
+  --output datasets/no_transition_motion_index.json \
+  --summary datasets/no_transition_summary.json \
+  --boundary-window-s 0.25
 ```
 
-## Troubleshooting
+## Train baselines (RSL-RL, Direct workflow)
 
-### Pylance Missing Indexing of Extensions
+`prior_mode` options:
+- `ppo_cmd`
+- `fullbody_amp`
+- `partwise_raw`
+- `famtp_stage1` (reserved hook)
+- `famtp_full` (reserved hook)
 
-In some VsCode versions, the indexing of part of the extensions is missing.
-In this case, add the path to your extension in `.vscode/settings.json` under the key `"python.analysis.extraPaths"`.
+Train `ppo_cmd`:
 
-```json
-{
-    "python.analysis.extraPaths": [
-        "<path-to-ext-repo>/source/famtp_lab"
-    ]
-}
+```bash
+python scripts/rsl_rl/train.py --task FaMTP-Humanoid-Switch-Direct-v0 --prior-mode ppo_cmd --chain-mode random --headless
 ```
 
-### Pylance Crash
+Train `fullbody_amp`:
 
-If you encounter a crash in `pylance`, it is probable that too many files are indexed and you run out of memory.
-A possible solution is to exclude some of omniverse packages that are not used in your project.
-To do so, modify `.vscode/settings.json` and comment out packages under the key `"python.analysis.extraPaths"`
-Some examples of packages that can likely be excluded are:
+```bash
+python scripts/rsl_rl/train.py --task FaMTP-Humanoid-Switch-Direct-v0 --prior-mode fullbody_amp --chain-mode random --headless
+```
 
-```json
-"<path-to-isaac-sim>/extscache/omni.anim.*"         // Animation packages
-"<path-to-isaac-sim>/extscache/omni.kit.*"          // Kit UI tools
-"<path-to-isaac-sim>/extscache/omni.graph.*"        // Graph UI tools
-"<path-to-isaac-sim>/extscache/omni.services.*"     // Services tools
-...
+Train `partwise_raw`:
+
+```bash
+python scripts/rsl_rl/train.py --task FaMTP-Humanoid-Switch-Direct-v0 --prior-mode partwise_raw --chain-mode random --headless
+```
+
+## Evaluate baselines with shared switch protocol
+
+Single-skill run:
+
+```bash
+python scripts/eval_switching.py --experiment-name week1_single_skill --mode single_skill --episodes 20
+```
+
+Random-switch run:
+
+```bash
+python scripts/eval_switching.py --experiment-name week1_random_switch --mode random_switch --episodes 20
+```
+
+Per-method run (optional):
+
+```bash
+python scripts/eval_switching.py --experiment-name week1_random_switch --mode random_switch --method fullbody_amp --episodes 20
+```
+
+## Plot and table exports
+
+Baseline comparison plots:
+
+```bash
+python scripts/plot_baseline_comparison.py --single-exp week1_single_skill --switch-exp week1_random_switch
+```
+
+Baseline comparison tables:
+
+```bash
+python scripts/export_baseline_tables.py --single-exp week1_single_skill --switch-exp week1_random_switch
+```
+
+Outputs:
+- plots: `outputs/plots/baseline_comparison/`
+- tables: `outputs/tables/baseline_comparison/`
+
+## Week-1 report workflow
+
+```bash
+python scripts/plot_week1_figures.py \
+  --dataset-summary datasets/no_transition_summary.json \
+  --single-skill-exp week1_single_skill \
+  --random-switch-exp week1_random_switch
+
+python scripts/week1_feasibility_report.py \
+  --dataset-summary datasets/no_transition_summary.json \
+  --single-skill-exp week1_single_skill \
+  --random-switch-exp week1_random_switch
+```
+
+## Notes on optional tracking_oracle baseline
+
+A true short-horizon tracking oracle needs direct motion-state tracking targets integrated into the Isaac Lab
+articulation state and reference clip playback pipeline. That integration is intentionally deferred to avoid
+adding a half-implemented baseline. The current code keeps stable hooks (`prior_mode`, modular reward terms,
+expert buffer utilities) so `tracking_oracle` can be added cleanly in a later stage.
+
+## Tests
+
+```bash
+pytest -q tests/test_imports.py tests/test_registry.py tests/test_env_smoke.py tests/test_discriminator_shapes.py tests/test_expert_buffer.py tests/test_prior_modes_smoke.py
 ```

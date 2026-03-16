@@ -1,10 +1,11 @@
-"""Play a trained RSL-RL checkpoint for FaMTP tasks."""
+"""Evaluate FaMTP checkpoint with simple rollout metrics."""
 
 from __future__ import annotations
 
 import argparse
 
 import gymnasium as gym
+import numpy as np
 
 import famtp_lab.tasks  # noqa: F401
 from famtp_lab.agents.rsl_rl.ppo_cfg import get_rsl_rl_ppo_cfg
@@ -12,10 +13,10 @@ from famtp_lab.agents.rsl_rl.wrappers import RslRlPolicyObsWrapper
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run checkpoint playback.")
+    parser = argparse.ArgumentParser(description="Evaluate trained checkpoint.")
     parser.add_argument("--task", type=str, default="FaMTP-Humanoid-Switch-Direct-v0")
     parser.add_argument("--checkpoint", type=str, required=True)
-    parser.add_argument("--num-steps", type=int, default=500)
+    parser.add_argument("--episodes", type=int, default=5)
     return parser.parse_args()
 
 
@@ -32,12 +33,21 @@ def main() -> None:
     runner.load(args.checkpoint)
     policy = runner.get_inference_policy(device="cpu")
 
-    obs, _ = env.reset()
-    for _ in range(args.num_steps):
-        actions = policy(obs)
-        obs, _, terminated, truncated, _ = env.step(actions)
-        if bool(terminated.any()) or bool(truncated.any()):
-            obs, _ = env.reset()
+    returns = []
+    for _ in range(args.episodes):
+        obs, _ = env.reset()
+        done = False
+        ep_return = 0.0
+        while not done:
+            actions = policy(obs)
+            obs, reward, terminated, truncated, _ = env.step(actions)
+            ep_return += float(np.mean(reward))
+            done = bool(terminated.any()) or bool(truncated.any())
+        returns.append(ep_return)
+
+    print(f"Episodes: {args.episodes}")
+    print(f"Mean return: {np.mean(returns):.4f}")
+    print(f"Std return: {np.std(returns):.4f}")
     env.close()
 
 
