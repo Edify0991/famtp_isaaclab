@@ -1,135 +1,139 @@
-# Template for Isaac Lab Projects
+# famtp-isaaclab
 
-## Overview
-
-This project/repository serves as a template for building projects or extensions based on Isaac Lab.
-It allows you to develop in an isolated environment, outside of the core Isaac Lab repository.
-
-**Key Features:**
-
-- `Isolation` Work outside the core Isaac Lab repository, ensuring that your development efforts remain self-contained.
-- `Flexibility` This template is set up to allow your code to be run as an extension in Omniverse.
-
-**Keywords:** extension, template, isaaclab
+External Isaac Lab project for FaMTP research using **Direct workflow** + **RSL-RL**.
+This stage implements **FaMTP Stage 1**:
+- part-wise manifold encoders,
+- latent part priors,
+- global coupling prior,
+- no bridge generation yet.
 
 ## Installation
 
-- Install Isaac Lab by following the [installation guide](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/index.html).
-  We recommend using the conda or uv installation as it simplifies calling Python scripts from the terminal.
+```bash
+pip install -e source/famtp_lab
+```
 
-- Clone or copy this project/repository separately from the Isaac Lab installation (i.e. outside the `IsaacLab` directory):
-
-- Using a python interpreter that has Isaac Lab installed, install the library in editable mode using:
-
-    ```bash
-    # use 'PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-    python -m pip install -e source/famtp_lab
-
-- Verify that the extension is correctly installed by:
-
-    - Listing the available tasks:
-
-        Note: It the task name changes, it may be necessary to update the search pattern `"Template-"`
-        (in the `scripts/list_envs.py` file) so that it can be listed.
-
-        ```bash
-        # use 'FULL_PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-        python scripts/list_envs.py
-        ```
-
-    - Running a task:
-
-        ```bash
-        # use 'FULL_PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-        python scripts/<RL_LIBRARY>/train.py --task=<TASK_NAME>
-        ```
-
-    - Running a task with dummy agents:
-
-        These include dummy agents that output zero or random agents. They are useful to ensure that the environments are configured correctly.
-
-        - Zero-action agent
-
-            ```bash
-            # use 'FULL_PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-            python scripts/zero_agent.py --task=<TASK_NAME>
-            ```
-        - Random-action agent
-
-            ```bash
-            # use 'FULL_PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-            python scripts/random_agent.py --task=<TASK_NAME>
-            ```
-
-### Set up IDE (Optional)
-
-To setup the IDE, please follow these instructions:
-
-- Run VSCode Tasks, by pressing `Ctrl+Shift+P`, selecting `Tasks: Run Task` and running the `setup_python_env` in the drop down menu.
-  When running this task, you will be prompted to add the absolute path to your Isaac Sim installation.
-
-If everything executes correctly, it should create a file .python.env in the `.vscode` directory.
-The file contains the python paths to all the extensions provided by Isaac Sim and Omniverse.
-This helps in indexing all the python modules for intelligent suggestions while writing code.
-
-### Setup as Omniverse Extension (Optional)
-
-We provide an example UI extension that will load upon enabling your extension defined in `source/famtp_lab/famtp_lab/ui_extension_example.py`.
-
-To enable your extension, follow these steps:
-
-1. **Add the search path of this project/repository** to the extension manager:
-    - Navigate to the extension manager using `Window` -> `Extensions`.
-    - Click on the **Hamburger Icon**, then go to `Settings`.
-    - In the `Extension Search Paths`, enter the absolute path to the `source` directory of this project/repository.
-    - If not already present, in the `Extension Search Paths`, enter the path that leads to Isaac Lab's extension directory directory (`IsaacLab/source`)
-    - Click on the **Hamburger Icon**, then click `Refresh`.
-
-2. **Search and enable your extension**:
-    - Find your extension under the `Third Party` category.
-    - Toggle it to enable your extension.
-
-## Code formatting
-
-We have a pre-commit template to automatically format your code.
-To install pre-commit:
+## 1) Build no-transition dataset
 
 ```bash
-pip install pre-commit
+python scripts/build_no_transition_dataset.py \
+  --input datasets/motion_index.json \
+  --output datasets/no_transition_motion_index.json \
+  --summary datasets/no_transition_summary.json \
+  --boundary-window-s 0.25
 ```
 
-Then you can run pre-commit with:
+## 2) Train part encoders (Stage 1 pretraining)
 
 ```bash
-pre-commit run --all-files
+python scripts/train_part_encoders.py \
+  --steps 1000 \
+  --batch-size 64 \
+  --history-steps 4 \
+  --residual-dim 2
 ```
 
-## Troubleshooting
+Outputs:
+- `outputs/checkpoints/part_encoders/`
+- `outputs/logs/part_encoders/`
 
-### Pylance Missing Indexing of Extensions
+## 3) Train RL baselines
 
-In some VsCode versions, the indexing of part of the extensions is missing.
-In this case, add the path to your extension in `.vscode/settings.json` under the key `"python.analysis.extraPaths"`.
+Train `ppo_cmd`:
 
-```json
-{
-    "python.analysis.extraPaths": [
-        "<path-to-ext-repo>/source/famtp_lab"
-    ]
-}
+```bash
+python scripts/rsl_rl/train.py --task FaMTP-Humanoid-Switch-Direct-v0 --prior-mode ppo_cmd --chain-mode random --headless
 ```
 
-### Pylance Crash
+Train `fullbody_amp`:
 
-If you encounter a crash in `pylance`, it is probable that too many files are indexed and you run out of memory.
-A possible solution is to exclude some of omniverse packages that are not used in your project.
-To do so, modify `.vscode/settings.json` and comment out packages under the key `"python.analysis.extraPaths"`
-Some examples of packages that can likely be excluded are:
+```bash
+python scripts/rsl_rl/train.py --task FaMTP-Humanoid-Switch-Direct-v0 --prior-mode fullbody_amp --chain-mode random --headless
+```
 
-```json
-"<path-to-isaac-sim>/extscache/omni.anim.*"         // Animation packages
-"<path-to-isaac-sim>/extscache/omni.kit.*"          // Kit UI tools
-"<path-to-isaac-sim>/extscache/omni.graph.*"        // Graph UI tools
-"<path-to-isaac-sim>/extscache/omni.services.*"     // Services tools
-...
+Train `partwise_raw`:
+
+```bash
+python scripts/rsl_rl/train.py --task FaMTP-Humanoid-Switch-Direct-v0 --prior-mode partwise_raw --chain-mode random --headless
+```
+
+Train `famtp_stage1`:
+
+```bash
+python scripts/rsl_rl/train.py \
+  --task FaMTP-Humanoid-Switch-Direct-v0 \
+  --prior-mode famtp_stage1 \
+  --chain-mode random \
+  --use-manifold-encoder 1 \
+  --use-latent-part-priors 1 \
+  --use-global-coupling 1 \
+  --latent-history-steps 4 \
+  --latent-dim-residual 2 \
+  --headless
+```
+
+## 4) Run FaMTP Stage 1 ablations
+
+Disable latent part priors:
+
+```bash
+python scripts/rsl_rl/train.py --task FaMTP-Humanoid-Switch-Direct-v0 --prior-mode famtp_stage1 --use-latent-part-priors 0 --use-global-coupling 1 --use-manifold-encoder 1 --headless
+```
+
+Disable global coupling:
+
+```bash
+python scripts/rsl_rl/train.py --task FaMTP-Humanoid-Switch-Direct-v0 --prior-mode famtp_stage1 --use-latent-part-priors 1 --use-global-coupling 0 --use-manifold-encoder 1 --headless
+```
+
+Disable manifold encoder:
+
+```bash
+python scripts/rsl_rl/train.py --task FaMTP-Humanoid-Switch-Direct-v0 --prior-mode famtp_stage1 --use-manifold-encoder 0 --use-latent-part-priors 0 --use-global-coupling 0 --headless
+```
+
+## 5) Evaluate methods with shared switch protocol
+
+Single-skill:
+
+```bash
+python scripts/eval_switching.py --experiment-name week1_single_skill --mode single_skill --episodes 20
+```
+
+Random-switch:
+
+```bash
+python scripts/eval_switching.py --experiment-name week1_random_switch --mode random_switch --episodes 20
+```
+
+Evaluate only `famtp_stage1`:
+
+```bash
+python scripts/eval_switching.py --experiment-name stage1_random_switch --mode random_switch --method famtp_stage1 --episodes 20
+```
+
+## 6) Plotting and table exports
+
+```bash
+python scripts/plot_baseline_comparison.py --single-exp week1_single_skill --switch-exp week1_random_switch
+python scripts/export_baseline_tables.py --single-exp week1_single_skill --switch-exp week1_random_switch
+python scripts/plot_famtp_stage1_latents.py --experiment-name week1_random_switch
+python scripts/plot_reward_decomposition.py --experiment-name week1_random_switch
+```
+
+Outputs:
+- `outputs/plots/baseline_comparison/`
+- `outputs/tables/baseline_comparison/`
+- `outputs/plots/famtp_stage1_latents/`
+
+## Stage-2 attachment point (no bridge implemented yet)
+
+Stage 2 bridge generation will attach in `HumanoidSwitchEnv._get_rewards()` under `prior_mode == "famtp_full"`.
+At that point, bridge-generated latent transitions will feed additional transition-specific rewards and/or
+latent-target constraints. Stage 1 currently runs independently without any bridge logic.
+
+## Tests
+
+```bash
+pytest -q tests/test_imports.py tests/test_registry.py tests/test_env_smoke.py tests/test_discriminator_shapes.py tests/test_expert_buffer.py tests/test_prior_modes_smoke.py tests/test_manifold_stage1_shapes.py
 ```
