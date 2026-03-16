@@ -117,7 +117,7 @@ class HumanoidSwitchEnv(DirectRLEnv):
             "right_arm": self.state[:, 12:15],
         }
 
-    def _update_part_history(self) -> None:
+#     def _update_part_history(self) -> None:
     def _update_part_history(self) -> dict[str, torch.Tensor]:
         """Shift history and append current part obs.
 
