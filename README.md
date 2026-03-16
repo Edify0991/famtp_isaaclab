@@ -1,135 +1,85 @@
-# Template for Isaac Lab Projects
+# famtp-isaaclab
 
-## Overview
+Isaac Lab external project for Unitree **G1** motion dataset inspection and week-1 dataset entry building.
 
-This project/repository serves as a template for building projects or extensions based on Isaac Lab.
-It allows you to develop in an isolated environment, outside of the core Isaac Lab repository.
+## Week-1 motion viewing and dataset pipeline
 
-**Key Features:**
-
-- `Isolation` Work outside the core Isaac Lab repository, ensuring that your development efforts remain self-contained.
-- `Flexibility` This template is set up to allow your code to be run as an extension in Omniverse.
-
-**Keywords:** extension, template, isaaclab
-
-## Installation
-
-- Install Isaac Lab by following the [installation guide](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/index.html).
-  We recommend using the conda or uv installation as it simplifies calling Python scripts from the terminal.
-
-- Clone or copy this project/repository separately from the Isaac Lab installation (i.e. outside the `IsaacLab` directory):
-
-- Using a python interpreter that has Isaac Lab installed, install the library in editable mode using:
-
-    ```bash
-    # use 'PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-    python -m pip install -e source/famtp_lab
-
-- Verify that the extension is correctly installed by:
-
-    - Listing the available tasks:
-
-        Note: It the task name changes, it may be necessary to update the search pattern `"Template-"`
-        (in the `scripts/list_envs.py` file) so that it can be listed.
-
-        ```bash
-        # use 'FULL_PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-        python scripts/list_envs.py
-        ```
-
-    - Running a task:
-
-        ```bash
-        # use 'FULL_PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-        python scripts/<RL_LIBRARY>/train.py --task=<TASK_NAME>
-        ```
-
-    - Running a task with dummy agents:
-
-        These include dummy agents that output zero or random agents. They are useful to ensure that the environments are configured correctly.
-
-        - Zero-action agent
-
-            ```bash
-            # use 'FULL_PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-            python scripts/zero_agent.py --task=<TASK_NAME>
-            ```
-        - Random-action agent
-
-            ```bash
-            # use 'FULL_PATH_TO_isaaclab.sh|bat -p' instead of 'python' if Isaac Lab is not installed in Python venv or conda
-            python scripts/random_agent.py --task=<TASK_NAME>
-            ```
-
-### Set up IDE (Optional)
-
-To setup the IDE, please follow these instructions:
-
-- Run VSCode Tasks, by pressing `Ctrl+Shift+P`, selecting `Tasks: Run Task` and running the `setup_python_env` in the drop down menu.
-  When running this task, you will be prompted to add the absolute path to your Isaac Sim installation.
-
-If everything executes correctly, it should create a file .python.env in the `.vscode` directory.
-The file contains the python paths to all the extensions provided by Isaac Sim and Omniverse.
-This helps in indexing all the python modules for intelligent suggestions while writing code.
-
-### Setup as Omniverse Extension (Optional)
-
-We provide an example UI extension that will load upon enabling your extension defined in `source/famtp_lab/famtp_lab/ui_extension_example.py`.
-
-To enable your extension, follow these steps:
-
-1. **Add the search path of this project/repository** to the extension manager:
-    - Navigate to the extension manager using `Window` -> `Extensions`.
-    - Click on the **Hamburger Icon**, then go to `Settings`.
-    - In the `Extension Search Paths`, enter the absolute path to the `source` directory of this project/repository.
-    - If not already present, in the `Extension Search Paths`, enter the path that leads to Isaac Lab's extension directory directory (`IsaacLab/source`)
-    - Click on the **Hamburger Icon**, then click `Refresh`.
-
-2. **Search and enable your extension**:
-    - Find your extension under the `Third Party` category.
-    - Toggle it to enable your extension.
-
-## Code formatting
-
-We have a pre-commit template to automatically format your code.
-To install pre-commit:
-
+### 1) 扫描 G1 数据集
 ```bash
-pip install pre-commit
+python scripts/inspect_g1_amass_dataset.py --data-root <path>
 ```
 
-Then you can run pre-commit with:
-
+### 2) 启动 viewer（随机浏览）
 ```bash
-pre-commit run --all-files
+python scripts/view_g1_motion_dataset.py --data-root <path>
 ```
 
-## Troubleshooting
-
-### Pylance Missing Indexing of Extensions
-
-In some VsCode versions, the indexing of part of the extensions is missing.
-In this case, add the path to your extension in `.vscode/settings.json` under the key `"python.analysis.extraPaths"`.
-
-```json
-{
-    "python.analysis.extraPaths": [
-        "<path-to-ext-repo>/source/famtp_lab"
-    ]
-}
+### 3) 启动 viewer（指定 clip）
+```bash
+python scripts/view_g1_motion_dataset.py --clip <path/to/file.npz>
 ```
 
-### Pylance Crash
-
-If you encounter a crash in `pylance`, it is probable that too many files are indexed and you run out of memory.
-A possible solution is to exclude some of omniverse packages that are not used in your project.
-To do so, modify `.vscode/settings.json` and comment out packages under the key `"python.analysis.extraPaths"`
-Some examples of packages that can likely be excluded are:
-
-```json
-"<path-to-isaac-sim>/extscache/omni.anim.*"         // Animation packages
-"<path-to-isaac-sim>/extscache/omni.kit.*"          // Kit UI tools
-"<path-to-isaac-sim>/extscache/omni.graph.*"        // Graph UI tools
-"<path-to-isaac-sim>/extscache/omni.services.*"     // Services tools
-...
+### 4) viewer 仅浏览某个 skill
+```bash
+python scripts/view_g1_motion_dataset.py --motion-index datasets/canonical/week1_motion_index.json --skill dribble_like
 ```
+
+### 5) 挖 week1 skill
+```bash
+python scripts/mine_week1_skills_from_babel.py --babel-json <path> --g1-root <path>
+```
+
+### 6) 构建 week1 motion index
+```bash
+python scripts/build_week1_motion_index.py --input datasets/canonical/week1_candidate_motion_index.json
+```
+
+### 7) 构建 no-transition 数据集
+```bash
+python scripts/build_no_transition_dataset.py --input datasets/canonical/week1_motion_index.json
+```
+
+### 8) 生成图表
+```bash
+python scripts/plot_week1_dataset_figures.py --motion-index datasets/canonical/week1_motion_index.json
+```
+
+### 9) 生成 markdown 周报
+```bash
+python scripts/write_week1_dataset_report.py --report-root outputs/reports/week1_feasibility
+```
+
+## Viewer controls
+
+Main path: Isaac Lab standalone app loop + terminal command polling.
+Fallback path: terminal-only command loop (for environments where graphical key events are unavailable).
+
+Commands:
+- `space`: 播放/暂停
+- `left` / `right`: 单帧后退/前进
+- `up` / `down`: 上一个/下一个 clip
+- `shift+left` / `shift+right`: 快退/快进 10 帧
+- `[` / `]`: 降低/提高播放速度
+- `l`: 循环播放开关
+- `r`: 重置 clip
+- `g`: 随机 clip
+- `i`: overlay 开关
+- `k`: 保存当前帧截图
+- `p`: 导出关键帧条带图
+- `t`: 导出 root trajectory 图
+- `q` / `esc`: 退出
+
+Outputs:
+- `outputs/viewer_screenshots/`
+- `outputs/viewer_keyframes/`
+- `outputs/viewer_plots/`
+
+## Scope note
+
+当前阶段只做：
+- G1 重定向动作数据可视化
+- schema 检查/诊断
+- 第一周技能候选挖掘与数据入口构建
+- 周报素材导出
+
+不包含 AMP、FaMTP、bridge 或高级训练逻辑。
