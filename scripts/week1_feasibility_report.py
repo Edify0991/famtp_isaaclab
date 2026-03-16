@@ -28,7 +28,10 @@ def parse_args() -> argparse.Namespace:
 
 def load_metrics(exp_name: str) -> dict:
     metrics_path = Path("outputs/eval") / exp_name / "metrics.csv"
-    row = pd.read_csv(metrics_path).iloc[0].to_dict()
+    df = pd.read_csv(metrics_path)
+    if "method" in df.columns:
+        df = df[df["method"] == "ppo_cmd"]
+    row = df.iloc[0].to_dict()
     return row
 
 

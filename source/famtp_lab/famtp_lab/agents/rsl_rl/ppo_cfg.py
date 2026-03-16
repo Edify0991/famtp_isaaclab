@@ -2,12 +2,9 @@
 
 
 def get_rsl_rl_ppo_cfg(mode: str = "ppo_cmd") -> dict:
-    """Return a compact RSL-RL PPO config dictionary for week-1 baseline.
-
-    Args:
-        mode: Baseline mode identifier. Current stage supports only ``ppo_cmd``.
-    """
-    if mode != "ppo_cmd":
+    """Return compact RSL-RL PPO config for selected baseline mode."""
+    valid = {"ppo_cmd", "fullbody_amp", "partwise_raw", "famtp_stage1", "famtp_full"}
+    if mode not in valid:
         raise ValueError(f"Unsupported baseline mode '{mode}'.")
 
     return {
@@ -15,7 +12,7 @@ def get_rsl_rl_ppo_cfg(mode: str = "ppo_cmd") -> dict:
         "device": "cuda:0",
         "max_iterations": 1500,
         "save_interval": 100,
-        "experiment_name": "famtp_week1_switch",
+        "experiment_name": "famtp_baseline_compare",
         "run_name": mode,
         "algorithm": {
             "class_name": "PPO",

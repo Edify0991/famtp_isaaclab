@@ -19,6 +19,7 @@ import torch
 import famtp_lab.tasks  # noqa: F401
 from famtp_lab.agents.rsl_rl.ppo_cfg import get_rsl_rl_ppo_cfg
 from famtp_lab.agents.rsl_rl.wrappers import RslRlPolicyObsWrapper
+from famtp_lab.tasks.direct.humanoid_switch.humanoid_switch_env_cfg import HumanoidSwitchEnvCfg
 
 
 def parse_args() -> argparse.Namespace:
@@ -29,18 +30,28 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-iterations", type=int, default=None)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--logdir", type=Path, default=Path("logs/rsl_rl"))
-    parser.add_argument("--baseline-mode", type=str, default="ppo_cmd", choices=["ppo_cmd"])
+    parser.add_argument(
+        "--prior-mode",
+        type=str,
+        default="ppo_cmd",
+        choices=["ppo_cmd", "fullbody_amp", "partwise_raw", "famtp_stage1", "famtp_full"],
+    )
     parser.add_argument("--chain-mode", type=str, default="fixed", choices=["fixed", "random"])
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    env = gym.make(args.task)
-    # Hook: inject env cfg overrides for week-1 and future AMP/FaMTP variants.
+    env_cfg = HumanoidSwitchEnvCfg()
+    env_cfg.prior_mode = args.prior_mode
+    env_cfg.chain_mode = args.chain_mode
+    if args.num_envs is not None:
+        env_cfg.scene.num_envs = args.num_envs
+
+    env = gym.make(args.task, cfg=env_cfg)
     env = RslRlPolicyObsWrapper(env)
 
-    cfg = get_rsl_rl_ppo_cfg(mode=args.baseline_mode)
+    cfg = get_rsl_rl_ppo_cfg(mode=args.prior_mode)
     if args.max_iterations is not None:
         cfg["max_iterations"] = args.max_iterations
 

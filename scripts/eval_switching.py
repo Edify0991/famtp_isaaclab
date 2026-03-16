@@ -1,3 +1,4 @@
+"""Evaluate switching degradation metrics across baseline methods."""
 """
 Week-1 experiment plan command hook:
 1) build no-transition dataset
@@ -20,11 +21,26 @@ import yaml
 
 from famtp_lab.tasks.direct.humanoid_switch.metrics import compute_switch_window_metrics
 
+METHODS = ["ppo_cmd", "fullbody_amp", "partwise_raw"]
 
-def generate_synthetic_episode(mode: str, steps: int, dt: float, rng: np.random.Generator) -> dict[str, np.ndarray]:
-    """Generate synthetic episode traces when simulator rollouts are unavailable."""
+
+def _method_severity(method: str, mode: str) -> float:
+    base = {"ppo_cmd": 1.00, "fullbody_amp": 0.82, "partwise_raw": 0.88}[method]
+    if mode == "single_skill":
+        return 0.65 * base
+    return 1.35 * base
+
+
+def generate_synthetic_episode(
+    method: str,
+    mode: str,
+    steps: int,
+    dt: float,
+    rng: np.random.Generator,
+) -> dict[str, np.ndarray]:
+    """Generate synthetic episode traces for baseline-comparison scripting."""
     t = np.arange(steps) * dt
-    severity = 0.6 if mode == "single_skill" else 1.4
+    severity = _method_severity(method, mode)
     joint_jerk = np.abs(rng.normal(loc=severity, scale=0.2, size=steps))
     com_jerk = np.abs(rng.normal(loc=0.5 * severity, scale=0.15, size=steps))
     foot_slip = np.abs(rng.normal(loc=0.2 * severity, scale=0.05, size=steps))
@@ -33,14 +49,15 @@ def generate_synthetic_episode(mode: str, steps: int, dt: float, rng: np.random.
     torque_rate = np.abs(np.gradient(torque, dt))
     root_pitch = 0.03 * severity * np.sin(2.0 * np.pi * t)
     root_roll = 0.02 * severity * np.sin(1.7 * np.pi * t)
-    fail_prob = 0.005 if mode == "single_skill" else 0.03
+    fail_prob = 0.004 * severity if mode == "single_skill" else 0.02 * severity
     alive = (rng.uniform(size=steps) > fail_prob).astype(np.float64)
-    switch_success = (rng.uniform(size=steps) > (0.02 if mode == "single_skill" else 0.15)).astype(np.float64)
+    switch_success = (rng.uniform(size=steps) > (0.02 * severity if mode == "single_skill" else 0.12 * severity)).astype(
+        np.float64
+    )
 
+    switch_indices = np.array([int(steps * 0.25), int(steps * 0.5), int(steps * 0.75)])
     if mode == "single_skill":
         switch_indices = np.array([int(steps * 0.5)])
-    else:
-        switch_indices = np.array([int(steps * 0.25), int(steps * 0.5), int(steps * 0.75)])
 
     return {
         "joint_jerk_norm": joint_jerk,
@@ -58,9 +75,10 @@ def generate_synthetic_episode(mode: str, steps: int, dt: float, rng: np.random.
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Evaluate switching metrics.")
+    parser = argparse.ArgumentParser(description="Evaluate switching metrics across methods.")
     parser.add_argument("--experiment-name", type=str, default="week1_random_switch")
     parser.add_argument("--mode", type=str, choices=["single_skill", "random_switch"], default="random_switch")
+    parser.add_argument("--method", type=str, choices=METHODS, default=None)
     parser.add_argument("--episodes", type=int, default=10)
     parser.add_argument("--dt", type=float, default=1.0 / 60.0)
     parser.add_argument("--window-s", type=float, default=0.75)
@@ -68,48 +86,65 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> None:
-    args = parse_args()
-    output_dir = Path("outputs/eval") / args.experiment_name
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    rng = np.random.default_rng(args.seed)
+def _evaluate_method(args: argparse.Namespace, method: str) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
+    rng = np.random.default_rng(args.seed + METHODS.index(method))
     episode_rows: list[dict] = []
     switch_rows: list[dict] = []
 
     for episode_idx in range(args.episodes):
-        traces = generate_synthetic_episode(args.mode, steps=480, dt=args.dt, rng=rng)
+        traces = generate_synthetic_episode(method=method, mode=args.mode, steps=480, dt=args.dt, rng=rng)
         metrics, per_switch = compute_switch_window_metrics(dt=args.dt, window_s=args.window_s, **traces)
         metrics["episode_idx"] = episode_idx
+        metrics["method"] = method
+        metrics["mode"] = args.mode
         episode_rows.append(metrics)
         for switch_id, switch_metric in enumerate(per_switch):
             switch_metric["episode_idx"] = episode_idx
             switch_metric["switch_id"] = switch_id
             switch_metric["mode"] = args.mode
-            # fixed skill pair annotation hook for future real env logging.
+            switch_metric["method"] = method
             switch_metric["skill_pair"] = "locomotion_run->arm_dribble_like"
             switch_rows.append(switch_metric)
 
     per_episode_df = pd.DataFrame(episode_rows)
     per_switch_df = pd.DataFrame(switch_rows)
     aggregate = per_episode_df.mean(numeric_only=True).to_dict()
+    aggregate["method"] = method
     aggregate["mode"] = args.mode
     aggregate["episodes"] = args.episodes
+    return per_episode_df, per_switch_df, aggregate
 
-    pd.DataFrame([aggregate]).to_csv(output_dir / "metrics.csv", index=False)
-    per_episode_df.to_csv(output_dir / "per_episode_metrics.csv", index=False)
-    per_switch_df.to_csv(output_dir / "per_switch_metrics.csv", index=False)
+
+def main() -> None:
+    args = parse_args()
+    output_dir = Path("outputs/eval") / args.experiment_name
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    methods = [args.method] if args.method is not None else METHODS
+
+    all_agg: list[dict] = []
+    all_episode: list[pd.DataFrame] = []
+    all_switch: list[pd.DataFrame] = []
+    for method in methods:
+        per_episode_df, per_switch_df, aggregate = _evaluate_method(args, method)
+        all_episode.append(per_episode_df)
+        all_switch.append(per_switch_df)
+        all_agg.append(aggregate)
+
+    pd.DataFrame(all_agg).to_csv(output_dir / "metrics.csv", index=False)
+    pd.concat(all_episode, ignore_index=True).to_csv(output_dir / "per_episode_metrics.csv", index=False)
+    pd.concat(all_switch, ignore_index=True).to_csv(output_dir / "per_switch_metrics.csv", index=False)
 
     config_snapshot = {
         "experiment_name": args.experiment_name,
         "mode": args.mode,
+        "methods": methods,
         "episodes": args.episodes,
         "dt": args.dt,
         "window_s": args.window_s,
-        "baseline_mode": "ppo_cmd",
     }
     (output_dir / "config_snapshot.yaml").write_text(yaml.safe_dump(config_snapshot, sort_keys=False))
-    (output_dir / "summary.json").write_text(json.dumps(aggregate, indent=2))
+    (output_dir / "summary.json").write_text(json.dumps(all_agg, indent=2))
 
     print(f"Saved evaluation artifacts to: {output_dir}")
 

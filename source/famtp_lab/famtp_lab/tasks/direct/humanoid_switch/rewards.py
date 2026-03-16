@@ -3,26 +3,29 @@
 import torch
 
 
-def compute_ppo_cmd_reward(
+def compute_task_reward_terms(
     state: torch.Tensor,
     current_skill_id: torch.Tensor,
     target_skill_id: torch.Tensor,
     rew_alive_bonus: float,
     rew_stabilization_scale: float,
     rew_command_follow_scale: float,
-) -> torch.Tensor:
-    """Week-1 baseline reward: stabilization + command following + alive bonus.
+) -> dict[str, torch.Tensor]:
+    """Core task-side reward terms.
 
-    Shapes:
-        state: ``(N, D)``
-        current_skill_id: ``(N,)``
-        target_skill_id: ``(N,)``
+    Shape notes:
+        state: (N, D)
+        current_skill_id: (N,)
+        target_skill_id: (N,)
+        each term output: (N,)
     """
-    stabilization = torch.exp(-torch.sum(torch.square(state), dim=-1))
-    command_follow = (current_skill_id == target_skill_id).float()
-    alive = torch.ones_like(stabilization)
-    return (
-        rew_stabilization_scale * stabilization
-        + rew_command_follow_scale * command_follow
-        + rew_alive_bonus * alive
-    )
+    stabilization = rew_stabilization_scale * torch.exp(-torch.sum(torch.square(state), dim=-1))
+    command_follow = rew_command_follow_scale * (current_skill_id == target_skill_id).float()
+    alive = rew_alive_bonus * torch.ones_like(stabilization)
+    task_reward = stabilization + command_follow
+    return {
+        "task_reward": task_reward,
+        "alive_stability_reward": alive,
+        "stabilization_reward": stabilization,
+        "command_follow_reward": command_follow,
+    }

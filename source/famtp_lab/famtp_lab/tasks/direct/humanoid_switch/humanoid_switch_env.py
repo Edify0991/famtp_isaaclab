@@ -1,4 +1,4 @@
-"""Minimal DirectRLEnv implementation for humanoid skill switching."""
+"""DirectRLEnv implementation for humanoid skill switching with baseline priors."""
 
 from __future__ import annotations
 
@@ -10,28 +10,36 @@ import isaaclab.sim as sim_utils
 from isaaclab.envs import DirectRLEnv
 from isaaclab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
 
+from famtp_lab.baselines.common import merge_reward_terms
+from famtp_lab.baselines.fullbody_amp import FullBodyAmpBaseline
+from famtp_lab.baselines.partwise_raw import PartwiseRawBaseline
+
 from .commands import SkillSwitchScheduler, skill_id_tensor_to_labels
 from .humanoid_switch_env_cfg import HumanoidSwitchEnvCfg
 from .metrics import skill_switch_accuracy
 from .observations import build_policy_obs
-from .rewards import compute_ppo_cmd_reward
+from .rewards import compute_task_reward_terms
 from .terminations import compute_terminated
 
 
 class HumanoidSwitchEnv(DirectRLEnv):
-    """Tensor-only week-1 env skeleton with explicit switch protocol state."""
+    """Week baseline env with ppo_cmd/fullbody_amp/partwise_raw prior modes."""
 
     cfg: HumanoidSwitchEnvCfg
 
     def __init__(self, cfg: HumanoidSwitchEnvCfg, render_mode: str | None = None, **kwargs):
         self._state_dim = 16
         self._action_dim = cfg.action_space
+        self._part_dim = 3
         self.scheduler = SkillSwitchScheduler(
             switch_time_min_s=cfg.switch_time_min_s,
             switch_time_max_s=cfg.switch_time_max_s,
             chain_mode=cfg.chain_mode,
             num_skills=cfg.num_skills,
         )
+
+        self._fullbody_amp = FullBodyAmpBaseline(obs_dim=self._state_dim)
+        self._partwise_raw = PartwiseRawBaseline(part_input_dim=self._part_dim)
         super().__init__(cfg, render_mode=render_mode, **kwargs)
 
         self.state = torch.zeros((self.num_envs, self._state_dim), device=self.device)
@@ -85,10 +93,23 @@ class HumanoidSwitchEnv(DirectRLEnv):
         obs = build_policy_obs(self.state, self.current_skill_id, self.target_skill_id)
         return {"policy": obs}
 
+    def _extract_part_obs(self) -> dict[str, torch.Tensor]:
+        """Build part observations from raw state slices.
+
+        Shape notes:
+            state: (N, 16)
+            part_obs[name]: (N, 3)
+        """
+        return {
+            "left_leg": self.state[:, 0:3],
+            "right_leg": self.state[:, 3:6],
+            "torso": self.state[:, 6:9],
+            "left_arm": self.state[:, 9:12],
+            "right_arm": self.state[:, 12:15],
+        }
+
     def _get_rewards(self) -> torch.Tensor:
-        if self.cfg.policy_mode != "ppo_cmd":
-            raise ValueError(f"Unsupported policy_mode '{self.cfg.policy_mode}' for week-1 baseline")
-        return compute_ppo_cmd_reward(
+        reward_terms = compute_task_reward_terms(
             state=self.state,
             current_skill_id=self.current_skill_id,
             target_skill_id=self.target_skill_id,
@@ -96,6 +117,25 @@ class HumanoidSwitchEnv(DirectRLEnv):
             rew_stabilization_scale=self.cfg.rew_stabilization_scale,
             rew_command_follow_scale=self.cfg.rew_command_follow_scale,
         )
+
+        if self.cfg.prior_mode == "ppo_cmd":
+            pass
+        elif self.cfg.prior_mode == "fullbody_amp":
+            disc_reward = self._fullbody_amp.reward(self.state, scale=self.cfg.rew_fullbody_disc_scale)
+            reward_terms["disc_fullbody"] = disc_reward
+        elif self.cfg.prior_mode == "partwise_raw":
+            part_terms = self._partwise_raw.reward_terms(self._extract_part_obs(), scale=self.cfg.rew_part_disc_scale)
+            reward_terms.update(part_terms)
+        elif self.cfg.prior_mode in {"famtp_stage1", "famtp_full"}:
+            # Reserved for future FaMTP integration while keeping interface stable.
+            pass
+        else:
+            raise ValueError(f"Unsupported prior_mode '{self.cfg.prior_mode}'")
+
+        for term_name, term_value in reward_terms.items():
+            self.extras[f"reward/{term_name}"] = term_value.clone()
+
+        return merge_reward_terms(reward_terms)
 
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
         terminated = compute_terminated(self.state)

@@ -64,8 +64,10 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     dataset_summary = json.loads(Path(args.dataset_summary).read_text())
-    single_metrics = pd.read_csv(Path("outputs/eval") / args.single_skill_exp / "metrics.csv").iloc[0]
-    random_metrics = pd.read_csv(Path("outputs/eval") / args.random_switch_exp / "metrics.csv").iloc[0]
+    single_df = pd.read_csv(Path("outputs/eval") / args.single_skill_exp / "metrics.csv")
+    random_df = pd.read_csv(Path("outputs/eval") / args.random_switch_exp / "metrics.csv")
+    single_metrics = single_df[single_df["method"] == "ppo_cmd"].iloc[0] if "method" in single_df else single_df.iloc[0]
+    random_metrics = random_df[random_df["method"] == "ppo_cmd"].iloc[0] if "method" in random_df else random_df.iloc[0]
 
     # Figure 1
     skills = sorted(set(dataset_summary["per_skill_duration_before"].keys()) | set(dataset_summary["per_skill_duration_after"].keys()))
