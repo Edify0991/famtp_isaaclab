@@ -21,12 +21,12 @@ import yaml
 
 from famtp_lab.tasks.direct.humanoid_switch.metrics import compute_switch_window_metrics
 
-METHODS = ["ppo_cmd", "fullbody_amp", "partwise_raw", "famtp_stage1"]
+METHODS = ["ppo_cmd", "fullbody_amp", "partwise_raw", "famtp_stage1", "famtp_nobridge", "famtp_full"]
 PARTS = ["left_leg", "right_leg", "torso", "left_arm", "right_arm"]
 
 
 def _method_severity(method: str, mode: str) -> float:
-    base = {"ppo_cmd": 1.00, "fullbody_amp": 0.82, "partwise_raw": 0.88, "famtp_stage1": 0.74}[method]
+    base = {"ppo_cmd": 1.00, "fullbody_amp": 0.82, "partwise_raw": 0.88, "famtp_stage1": 0.74, "famtp_nobridge": 0.77, "famtp_full": 0.68}[method]
     return 0.65 * base if mode == "single_skill" else 1.35 * base
 
 
@@ -34,9 +34,12 @@ def _reward_breakdown(method: str, severity: float) -> dict[str, float]:
     task = float(1.4 - 0.3 * severity)
     latent_part = float(0.0)
     coupling = float(0.0)
-    if method == "famtp_stage1":
+    if method in {"famtp_stage1", "famtp_nobridge"}:
         latent_part = float(0.5 - 0.1 * severity)
         coupling = float(0.45 - 0.08 * severity)
+    if method == "famtp_full":
+        latent_part = float(0.55 - 0.08 * severity)
+        coupling = float(0.55 - 0.08 * severity)
     elif method == "fullbody_amp":
         latent_part = float(0.25 - 0.06 * severity)
     elif method == "partwise_raw":
@@ -52,7 +55,7 @@ def _reward_breakdown(method: str, severity: float) -> dict[str, float]:
 def _synthetic_latents(rng: np.random.Generator, method: str, mode: str, n: int = 300) -> pd.DataFrame:
     rows = []
     skill_labels = ["locomotion_run", "arm_dribble_like", "stop_shoot_pose"]
-    spread = {"ppo_cmd": 1.1, "fullbody_amp": 0.9, "partwise_raw": 0.85, "famtp_stage1": 0.7}[method]
+    spread = {"ppo_cmd": 1.1, "fullbody_amp": 0.9, "partwise_raw": 0.85, "famtp_stage1": 0.7, "famtp_nobridge": 0.72, "famtp_full": 0.6}[method]
     for part in PARTS:
         for skill in skill_labels:
             center = skill_labels.index(skill) * 1.2

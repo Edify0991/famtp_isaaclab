@@ -4,12 +4,15 @@ from .expert_buffer import ExpertBuffer, ExpertSegment
 
 try:
     from .amp_discriminator import AmpDiscriminator
+    from .bridge_generator import BridgeGeneratorCfg, LatentBridgeGenerator
     from .coupling import GlobalCouplingScorer
     from .latent_part_discriminators import LatentPartDiscriminators
     from .manifold_encoders import ManifoldEncoderCfg, MultiPartManifoldEncoder, SharedPartManifoldEncoder
     from .part_discriminators import PART_NAMES, PartwiseConfig, PartwiseRawDiscriminators
 except ModuleNotFoundError:  # pragma: no cover - optional torch dependency
     AmpDiscriminator = None
+    BridgeGeneratorCfg = None
+    LatentBridgeGenerator = None
     LatentPartDiscriminators = None
     GlobalCouplingScorer = None
     ManifoldEncoderCfg = None
@@ -21,6 +24,8 @@ except ModuleNotFoundError:  # pragma: no cover - optional torch dependency
 
 __all__ = [
     "AmpDiscriminator",
+    "BridgeGeneratorCfg",
+    "LatentBridgeGenerator",
     "ExpertBuffer",
     "ExpertSegment",
     "LatentPartDiscriminators",

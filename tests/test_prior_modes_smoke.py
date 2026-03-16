@@ -10,7 +10,7 @@ import famtp_lab.tasks  # noqa: F401
 from famtp_lab.tasks.direct.humanoid_switch.humanoid_switch_env_cfg import HumanoidSwitchEnvCfg
 
 
-@pytest.mark.parametrize("prior_mode", ["ppo_cmd", "fullbody_amp", "partwise_raw", "famtp_stage1", "famtp_full"])
+@pytest.mark.parametrize("prior_mode", ["ppo_cmd", "fullbody_amp", "partwise_raw", "famtp_stage1", "famtp_nobridge", "famtp_full"])
 def test_prior_mode_step(prior_mode: str) -> None:
     cfg = HumanoidSwitchEnvCfg()
     cfg.prior_mode = prior_mode

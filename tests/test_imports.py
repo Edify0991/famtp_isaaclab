@@ -19,3 +19,4 @@ def test_stage1_module_imports() -> None:
     import famtp_lab.priors.manifold_encoders  # noqa: F401
     import famtp_lab.priors.latent_part_discriminators  # noqa: F401
     import famtp_lab.priors.coupling  # noqa: F401
+    import famtp_lab.priors.bridge_generator  # noqa: F401

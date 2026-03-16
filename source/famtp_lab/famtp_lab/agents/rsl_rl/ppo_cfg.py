@@ -3,7 +3,7 @@
 
 def get_rsl_rl_ppo_cfg(mode: str = "ppo_cmd") -> dict:
     """Return compact RSL-RL PPO config for selected baseline mode."""
-    valid = {"ppo_cmd", "fullbody_amp", "partwise_raw", "famtp_stage1", "famtp_full"}
+    valid = {"ppo_cmd", "fullbody_amp", "partwise_raw", "famtp_stage1", "famtp_nobridge", "famtp_full"}
     if mode not in valid:
         raise ValueError(f"Unsupported baseline mode '{mode}'.")
 

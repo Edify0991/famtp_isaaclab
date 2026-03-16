@@ -1,5 +1,7 @@
 """Train FaMTP environments with RSL-RL baselines."""
 
+from __future__ import annotations
+
 """
 Week-1 experiment plan command hook:
 1) build no-transition dataset
@@ -36,7 +38,7 @@ def parse_args() -> argparse.Namespace:
         "--prior-mode",
         type=str,
         default="ppo_cmd",
-        choices=["ppo_cmd", "fullbody_amp", "partwise_raw", "famtp_stage1", "famtp_full"],
+        choices=["ppo_cmd", "fullbody_amp", "partwise_raw", "famtp_stage1", "famtp_nobridge", "famtp_full"],
     )
     parser.add_argument("--chain-mode", type=str, default="fixed", choices=["fixed", "random"])
     parser.add_argument("--use-manifold-encoder", type=int, choices=[0,1], default=1)
@@ -44,6 +46,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--use-global-coupling", type=int, choices=[0,1], default=1)
     parser.add_argument("--latent-history-steps", type=int, default=4)
     parser.add_argument("--latent-dim-residual", type=int, default=2)
+    parser.add_argument("--bridge-horizon-steps", type=int, default=12)
+    parser.add_argument("--bridge-replan-mode", type=str, default="on_switch", choices=["on_switch", "periodic"])
+    parser.add_argument("--use-target-anchor", type=int, choices=[0,1], default=1)
+    parser.add_argument("--bridge-update-interval", type=int, default=2)
     return parser.parse_args()
 
 
@@ -55,13 +61,17 @@ def main() -> None:
     if args.num_envs is not None:
         env_cfg.scene.num_envs = args.num_envs
 
-    # FaMTP stage-1 ablations.
-    if args.prior_mode == "famtp_stage1":
+    # FaMTP ablations.
+    if args.prior_mode in {"famtp_stage1", "famtp_nobridge", "famtp_full"}:
         env_cfg.use_manifold_encoder = bool(args.use_manifold_encoder)
         env_cfg.use_latent_part_priors = bool(args.use_latent_part_priors)
         env_cfg.use_global_coupling = bool(args.use_global_coupling)
         env_cfg.latent_history_steps = args.latent_history_steps
         env_cfg.latent_dim_residual = args.latent_dim_residual
+        env_cfg.bridge_horizon_steps = args.bridge_horizon_steps
+        env_cfg.bridge_replan_mode = args.bridge_replan_mode
+        env_cfg.use_target_anchor = bool(args.use_target_anchor)
+        env_cfg.bridge_update_interval = args.bridge_update_interval
 
     env = gym.make(args.task, cfg=env_cfg)
     env = RslRlPolicyObsWrapper(env)
