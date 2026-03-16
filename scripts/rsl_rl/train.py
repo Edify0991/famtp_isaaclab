@@ -1,4 +1,12 @@
-"""Train FaMTP environments with RSL-RL baselines."""
+"""
+Week-1 experiment plan command hook:
+1) build no-transition dataset
+2) train ppo_cmd
+3) evaluate single-skill
+4) evaluate random-switch
+5) generate figures/report
+
+Train FaMTP environments with RSL-RL."""
 
 from __future__ import annotations
 

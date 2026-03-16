@@ -1,4 +1,13 @@
 """Evaluate switching degradation metrics across baseline methods."""
+"""
+Week-1 experiment plan command hook:
+1) build no-transition dataset
+2) train ppo_cmd
+3) evaluate single-skill
+4) evaluate random-switch
+5) generate figures/report
+
+Evaluate week-1 switching degradation metrics and export CSV/JSON artifacts."""
 
 from __future__ import annotations
 
