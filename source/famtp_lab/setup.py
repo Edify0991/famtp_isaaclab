@@ -9,7 +9,7 @@ setup(
     author="famtp-isaaclab contributors",
     packages=find_packages(),
     include_package_data=True,
-    install_requires=["gymnasium", "numpy", "torch"],
+    install_requires=["gymnasium", "numpy", "torch", "pandas", "matplotlib", "PyYAML"],
     python_requires=">=3.10",
     zip_safe=False,
 )
